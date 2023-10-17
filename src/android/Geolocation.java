@@ -197,7 +197,7 @@ public class Geolocation extends CordovaPlugin implements OnLocationResultEventL
 
     @SuppressLint("MissingPermission")
     private void requestLocationUpdates(LocationContext locationContext, LocationRequest request) {
-        if (isConnectedToData(cordova.getContext()) || isConnectedToWifi(cordova.getContext())){
+        if (isConnectedToWifiOrData(cordova.getContext())){
             fusedLocationClient.requestLocationUpdates(request, locationContext.getLocationCallback(), null);
         }
         else {
@@ -229,36 +229,16 @@ public class Geolocation extends CordovaPlugin implements OnLocationResultEventL
     @Override
     public void onLocationResultSuccess(LocationContext locationContext, LocationResult locationResult) {
         for (Location location : locationResult.getLocations()) {
-            try {
-                JSONObject locationObject = LocationUtils.locationToJSON(location);
-                PluginResult result = new PluginResult(PluginResult.Status.OK, locationObject);
-
-                if (locationContext.getType() == LocationContext.Type.UPDATE) {
-                    result.setKeepCallback(true);
-                }
-                else {
-                    locationContexts.delete(locationContext.getId());
-                }
-
-                locationContext.getCallbackContext().sendPluginResult(result);
-
-            } catch (JSONException e) {
-                PluginResult result = new PluginResult(PluginResult.Status.JSON_EXCEPTION, LocationError.SERIALIZATION_ERROR.toJSON());
-
-                if (locationContext.getType() == LocationContext.Type.UPDATE) {
-                    result.setKeepCallback(true);
-                }
-                else {
-                    locationContexts.delete(locationContext.getId());
-                }
-
-                locationContext.getCallbackContext().sendPluginResult(result);
-            }
+            sendLocationResultSuccess(locationContext, location);
         }
     }
 
     @Override
     public void onLocationGPSResultSuccess(LocationContext locationContext, Location locationResult) {
+        sendLocationResultSuccess(locationContext, locationResult);
+    }
+
+    private void sendLocationResultSuccess(LocationContext locationContext, Location locationResult) {
         try {
             JSONObject locationObject = LocationUtils.locationToJSON(locationResult);
             PluginResult result = new PluginResult(PluginResult.Status.OK, locationObject);
@@ -345,7 +325,7 @@ public class Geolocation extends CordovaPlugin implements OnLocationResultEventL
         task.addOnFailureListener(checkLocationSettingsOnFailure);
     }
 
-    private static boolean isConnectedToWifi(Context context) {
+    private static boolean isConnectedToWifiOrData(Context context) {
         ConnectivityManager connManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         Network network = connManager.getActiveNetwork();
 
@@ -354,22 +334,10 @@ public class Geolocation extends CordovaPlugin implements OnLocationResultEventL
         }
 
         NetworkCapabilities networkCapabilities = connManager.getNetworkCapabilities(network);
-        return networkCapabilities != null &&
-                (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-                        || (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI_AWARE)
-                ));
-    }
-
-    private static boolean isConnectedToData(Context context) {
-        ConnectivityManager connManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-        Network network = connManager.getActiveNetwork();
-
-        if (network == null) {
-            return false;  // No active network
-        }
-
-        NetworkCapabilities networkCapabilities = connManager.getNetworkCapabilities(network);
-        return networkCapabilities != null && networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
+        return networkCapabilities != null
+                && (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                || networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI_AWARE)
+                || networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR));
     }
 
 }
