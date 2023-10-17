@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixes
+- Android: Use LocationManager with GPS when wifi and data are unavailable [RMET-2834](https://outsystemsrd.atlassian.net/browse/RMET-2893)
+
 ## [4.0.1-OS11]
 ### Fixes
 - Fixed Android MABS 10 build by removing android support libraries [RMET-2834](https://outsystemsrd.atlassian.net/browse/RMET-2834)
