@@ -1,12 +1,16 @@
 package org.apache.cordova.geolocation;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.Manifest;
 import android.location.Location;
 import androidx.annotation.NonNull;
 
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.util.SparseArray;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -38,6 +42,7 @@ public class Geolocation extends CordovaPlugin implements OnLocationResultEventL
 
     private SparseArray<LocationContext> locationContexts;
     private FusedLocationProviderClient fusedLocationClient;
+    private LocationHelper locationHelper;
 
     protected static final int REQUEST_CHECK_SETTINGS = 0x1;
 
@@ -48,6 +53,7 @@ public class Geolocation extends CordovaPlugin implements OnLocationResultEventL
         super.initialize(cordova, webView);
         locationContexts = new SparseArray<LocationContext>();
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(cordova.getActivity());
+        locationHelper = new LocationHelper(cordova.getContext());
     }
 
     @Override
@@ -58,7 +64,7 @@ public class Geolocation extends CordovaPlugin implements OnLocationResultEventL
 
         if ("getLocation".equals(action)) {
             int id = args.getString(3).hashCode();
-            LocationContext lc = new LocationContext(id, LocationContext.Type.RETRIEVAL, args, callbackContext, this);
+            LocationContext lc = new LocationContext(id, LocationContext.Type.RETRIEVAL, args, callbackContext, this, cordova.getContext());
             locationContexts.put(id, lc);
 
             if (hasPermission()) {
@@ -69,7 +75,7 @@ public class Geolocation extends CordovaPlugin implements OnLocationResultEventL
 
         } else if ("addWatch".equals(action)) {
             int id = args.getString(0).hashCode();
-            LocationContext lc = new LocationContext(id, LocationContext.Type.UPDATE, args, callbackContext, this);
+            LocationContext lc = new LocationContext(id, LocationContext.Type.UPDATE, args, callbackContext, this, cordova.getContext());
             locationContexts.put(id, lc);
 
             if (hasPermission()) {
@@ -158,7 +164,8 @@ public class Geolocation extends CordovaPlugin implements OnLocationResultEventL
 
         request.setNumUpdates(1);
 
-        // This is necessary to be able to get a response when location services are initially off and then turned on before this request.
+        // This is necessary to be able to get a response when
+        // location services are initially off and then turned on before this request.
         request.setInterval(0);
 
         if(enableHighAccuracy) {
@@ -190,7 +197,12 @@ public class Geolocation extends CordovaPlugin implements OnLocationResultEventL
 
     @SuppressLint("MissingPermission")
     private void requestLocationUpdates(LocationContext locationContext, LocationRequest request) {
-        fusedLocationClient.requestLocationUpdates(request, locationContext.getLocationCallback(), null);
+        if (isConnectedToData(cordova.getContext()) || isConnectedToWifi(cordova.getContext())){
+            fusedLocationClient.requestLocationUpdates(request, locationContext.getLocationCallback(), null);
+        }
+        else {
+            locationHelper.requestGPSLocationUpdates(0, 0, cordova.getContext(), locationContext.getLocationListener());
+        }
     }
 
     private void clearWatch(JSONArray args, CallbackContext callbackContext) {
@@ -242,6 +254,35 @@ public class Geolocation extends CordovaPlugin implements OnLocationResultEventL
 
                 locationContext.getCallbackContext().sendPluginResult(result);
             }
+        }
+    }
+
+    @Override
+    public void onLocationGPSResultSuccess(LocationContext locationContext, Location locationResult) {
+        try {
+            JSONObject locationObject = LocationUtils.locationToJSON(locationResult);
+            PluginResult result = new PluginResult(PluginResult.Status.OK, locationObject);
+
+            if (locationContext.getType() == LocationContext.Type.UPDATE) {
+                result.setKeepCallback(true);
+            }
+            else {
+                locationContexts.delete(locationContext.getId());
+            }
+
+            locationContext.getCallbackContext().sendPluginResult(result);
+
+        } catch (JSONException e) {
+            PluginResult result = new PluginResult(PluginResult.Status.JSON_EXCEPTION, LocationError.SERIALIZATION_ERROR.toJSON());
+
+            if (locationContext.getType() == LocationContext.Type.UPDATE) {
+                result.setKeepCallback(true);
+            }
+            else {
+                locationContexts.delete(locationContext.getId());
+            }
+
+            locationContext.getCallbackContext().sendPluginResult(result);
         }
     }
 
@@ -303,4 +344,32 @@ public class Geolocation extends CordovaPlugin implements OnLocationResultEventL
         task.addOnSuccessListener(checkLocationSettingsOnSuccess);
         task.addOnFailureListener(checkLocationSettingsOnFailure);
     }
+
+    private static boolean isConnectedToWifi(Context context) {
+        ConnectivityManager connManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        Network network = connManager.getActiveNetwork();
+
+        if (network == null) {
+            return false;  // No active network
+        }
+
+        NetworkCapabilities networkCapabilities = connManager.getNetworkCapabilities(network);
+        return networkCapabilities != null &&
+                (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                        || (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI_AWARE)
+                ));
+    }
+
+    private static boolean isConnectedToData(Context context) {
+        ConnectivityManager connManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        Network network = connManager.getActiveNetwork();
+
+        if (network == null) {
+            return false;  // No active network
+        }
+
+        NetworkCapabilities networkCapabilities = connManager.getNetworkCapabilities(network);
+        return networkCapabilities != null && networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR);
+    }
+
 }

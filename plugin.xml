@@ -57,6 +57,7 @@ xmlns:android="http://schemas.android.com/apk/res/android"
         <source-file src="src/android/LocationUtils.java" target-dir="src/org/apache/cordova/geolocation/" />
         <source-file src="src/android/OnLocationResultEventListener.java" target-dir="src/org/apache/cordova/geolocation/" />
         <source-file src="src/android/LocationError.java" target-dir="src/org/apache/cordova/geolocation/" />
+        <source-file src="src/android/LocationHelper.java" target-dir="src/org/apache/cordova/geolocation/" />
 
         <js-module src="www/Coordinates.js" name="Coordinates">
             <clobbers target="Coordinates" />
