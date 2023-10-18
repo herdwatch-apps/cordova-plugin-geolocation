@@ -201,6 +201,8 @@ public class Geolocation extends CordovaPlugin implements OnLocationResultEventL
             fusedLocationClient.requestLocationUpdates(request, locationContext.getLocationCallback(), null);
         }
         else {
+            //minTime is 0 because we want this call to always return a new location update
+            //minDistance is 0 because we want this call to always return a new location update
             locationHelper.requestGPSLocationUpdates(0, 0, cordova.getContext(), locationContext.getLocationListener());
         }
     }
@@ -239,31 +241,23 @@ public class Geolocation extends CordovaPlugin implements OnLocationResultEventL
     }
 
     private void sendLocationResultSuccess(LocationContext locationContext, Location locationResult) {
+        PluginResult result;
+
         try {
             JSONObject locationObject = LocationUtils.locationToJSON(locationResult);
-            PluginResult result = new PluginResult(PluginResult.Status.OK, locationObject);
-
-            if (locationContext.getType() == LocationContext.Type.UPDATE) {
-                result.setKeepCallback(true);
-            }
-            else {
-                locationContexts.delete(locationContext.getId());
-            }
-
-            locationContext.getCallbackContext().sendPluginResult(result);
-
+            result = new PluginResult(PluginResult.Status.OK, locationObject);
         } catch (JSONException e) {
-            PluginResult result = new PluginResult(PluginResult.Status.JSON_EXCEPTION, LocationError.SERIALIZATION_ERROR.toJSON());
-
-            if (locationContext.getType() == LocationContext.Type.UPDATE) {
-                result.setKeepCallback(true);
-            }
-            else {
-                locationContexts.delete(locationContext.getId());
-            }
-
-            locationContext.getCallbackContext().sendPluginResult(result);
+            result = new PluginResult(PluginResult.Status.JSON_EXCEPTION, LocationError.SERIALIZATION_ERROR.toJSON());
         }
+
+        if (locationContext.getType() == LocationContext.Type.UPDATE) {
+            result.setKeepCallback(true);
+        }
+        else {
+            locationContexts.delete(locationContext.getId());
+        }
+
+        locationContext.getCallbackContext().sendPluginResult(result);
     }
 
     @Override
