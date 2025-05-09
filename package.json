@@ -1,6 +1,6 @@
 {
   "name": "@herdwatch/cordova-plugin-geolocation",
-  "version": "5.0.1",
+  "version": "5.0.2",
   "description": "Cordova Geolocation Plugin",
   "cordova": {
     "id": "@herdwatch/cordova-plugin-geolocation",
